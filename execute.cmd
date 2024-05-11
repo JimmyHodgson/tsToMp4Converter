@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableDelayedExpansion
+setlocal DisableDelayedExpansion
 
 if not exist bad_extension ( mkdir bad_extension )
 if not exist processed ( mkdir processed )
@@ -7,33 +7,42 @@ if not exist output ( mkdir output )
 if not exist input ( mkdir input )
 
 for /f "delims==" %%f in ('dir /b input') do (
-    call :getDate
-    echo !_result! processing file "%%f" >> execute.log
-    set _ext=%%~xf
-    set _fil=%%~nf
-    if "!_ext!" EQU ".ts" (
+    :: Extract the file name without extension
+    for %%n in ("%%f") do (
         call :getDate
-        echo !_result! Extension ^<.ts^> verified >> execute.log
+        set "_name=%%f"
+        set "_fil=%%~nn"
+        set "_ext=%%~xn"
 
-        "lib\ffmpeg.exe" -loglevel quiet -i "input\%%f" -codec copy "output\!_fil!.mp4"
+        :: Use delayed expansion only to print, preventing !! interpretation issues
+        setlocal EnableDelayedExpansion
+        echo !_result! processing file "!_name!" >> execute.log
+        if "!_ext!" EQU ".ts" (
+            call :getDate
+            echo !_result! Extension ^<.ts^> verified >> execute.log
 
-        call :getDate
-        if errorlevel 1 (
-            echo !_result! Error converting file %%f >> execute.log
+            "lib\ffmpeg.exe" -loglevel quiet -i "input\!_name!" -codec copy "output\!_fil!.mp4"
+
+            call :getDate
+            if errorlevel 1 (
+                echo !_result! Error converting file !_name! >> execute.log
+            ) else (
+                echo !_result! File !_name! converted successfully. >> execute.log
+
+                move "input\!_name!" "processed\!_name!"
+            )
+
         ) else (
-            echo !_result! File %%f converted successfully. >> execute.log
+            call :getDate
 
-            move "input\%%f" "processed\%%f"
+            echo !_result! Unable to process file, extension is ^<!_ext!^> expected ^<.ts^> >> execute.log
+
+            move "input\!_name!" "bad_extension\!_name!"
+
         )
-
-    ) else (
-        call :getDate
-
-        echo !_result! Unable to process file, extension is ^<!_ext!^> expected ^<.ts^> >> execute.log
-
-        move "input\%%f" "bad_extension\%%f"
-
+        endlocal
     )
+
 
 )
 
